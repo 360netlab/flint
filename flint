@@ -1,0 +1,309 @@
+#!/usr/bin/python
+import sys
+import socket
+import urllib2
+import hashlib
+import optparse
+import time
+from StringIO import StringIO
+from datetime import datetime
+try:
+    import json
+except ImportError:
+    import simplejson as json
+
+__VERSION__ = "0.1.3"
+
+__AUTHOR__ = "netlab@360.cn"
+
+
+
+#Contact passivedns@360.cn get the api address
+API = ""
+
+#You must assign the key we allocated for you.
+API_KEY = ""
+
+
+FLINT_TABLES = ['rrset', 'rdata']
+
+FLINT_SORT_FIELD = ["time_last", "time_first", "count"]
+
+FLINT_TYPES = {
+        "A" : 1,
+        "NS" : 2,
+        "MD" : 3,
+        "CNAME" : 5,
+        "SOA" : 6,
+        "PTR" : 12,
+        "MX" : 15,
+        "TXT" : 16,
+        "AAAA" : 28,
+        "SRV" : 33,
+        "DNAME" : 39,
+        "DS" : 43,
+        "RRSIG" : 46,
+        "NSEC" : 47,
+        "NSEC3" : 50
+}
+
+
+class FlintClient(object):
+
+    TIMEOUT = 20
+
+    def __init__(self, 
+                sort = 'time_last', 
+                reverse = False, 
+                json = False,
+                limit = 1000, 
+                before = None,
+                after = None, 
+                verbose = False, 
+                **kwargs):
+        self.sort = sort
+        self.reverse = reverse
+        self.json = json
+        self.limit = limit
+        self.before = before
+        self.after = after
+        self.verbose = verbose
+
+    def __call__(self, f_table, f_keyword, f_type):
+        getattr(self, f_table)(f_keyword, f_type)
+
+    def query(self, f_table, f_keyword, f_type = None, f_netmask = None):
+        path = "/api/%s/keyword/%s/count/%s/" %(f_table, f_keyword, self.limit)
+        if f_type is not None:
+            path = "%srtype/%s/" %(path, FLINT_TYPES[f_type])
+        if f_netmask is not None:
+            path = "%smask/%s/" %(path, str(f_netmask))
+        if API.startswith("http://"):
+            url = "%s%s" %(API, path)
+        else:
+            url = "http://%s%s" %(API, path)
+        req = urllib2.Request(url)
+        req.add_header('Accept', 'application/json')
+        if API_KEY:
+            token = self.genToken(path,API_KEY)
+            req.add_header('X-BashToken', token)
+
+        try:
+            http = urllib2.urlopen(req, timeout=self.TIMEOUT)
+            resp = http.read()
+        except socket.timeout:
+            print "api timeout. please try again"
+            sys.exit(1)
+        except (urllib2.HTTPError, urllib2.URLError),e:
+            print "api access '%s' failed" %(url)
+            sys.exit(1)
+
+        if self.verbose:
+            print "Request: "
+            print url
+            print req.headers
+            print "\n"
+            print "Response:"
+            print resp
+            print http.code
+            print http.headers
+
+        try:
+            resp = json.loads(resp)
+        except:
+            print "api error"
+            sys.exit(1)
+        return resp
+
+    def filter(self, resp):
+        resp = sorted(resp, key=lambda x:x[self.sort], reverse=self.reverse)
+        if self.before:
+            try:
+                before = self.time_parse(self.before)
+                resp = filter(lambda x:x['time_first'] < before, resp)
+            except ValueError, e:
+                print e
+        if self.after:
+            try:
+                after = self.time_parse(self.after)
+                resp = filter(lambda x:x['time_last'] > after, resp)
+            except ValueError,e:
+                print e
+        return resp
+
+
+    def rrset(self, rrname, rrtype=None):
+        def _print(rrname, rrtype, resp):
+            s = StringIO()
+            s.write("%s %s In rrset\n" %(rrname, rrtype or "All Type"))
+            s.write("-------\n")
+            for r in resp:
+                s.write("Record times: %s -- %s\n" %(self._timefmt(r['time_first']), self._timefmt(r['time_last'])))
+                s.write("Count: %d\n" %(int(r['count'])))
+                rdata = r['rdata'].rstrip(";").split(";")
+                for data in rdata:
+                    s.write("%s\t%s\t%s\n" %(r['rrname'], r['rrtype'], data))
+                s.write("\n")
+            s.seek(0)
+            print s.read()
+                
+
+        resp = self.query("rrset", rrname, rrtype)
+        if resp:
+            resp = self.filter(resp)
+            if self.json:
+                print json.dumps(resp)
+                return json.dumps(resp)
+            else:
+                _print(rrname, rrtype, resp)
+        else:
+            print "Empty"
+        
+
+    def rdata(self, rdata, rrtype=None):
+        def _print(rdata, rrtype, resp):
+            for r in resp:
+                print "%s\t%s\t%s" %(r['rrname'], r['rrtype'], r['rdata'])
+
+        if self.is_cidr(rdata):
+            ip, netmask = rdata.split("/")    
+            resp = self.query("rdata", ip, rrtype, netmask)
+        else:
+            resp = self.query("rdata", rdata, rrtype)
+
+        if resp:
+            if self.json:
+                print json.dumps(resp)
+                return json.dumps(resp)
+            else:
+                _print(rdata, rrtype, resp)
+        else:
+            print "Empty"
+
+
+    def _timefmt(self, ts):
+        try:
+            return datetime.fromtimestamp(ts)
+        except:
+            return ""
+
+    #This function is copy from dnsdb-query
+    def time_parse(self, s):
+        try:
+            epoch = int(s)
+            return epoch
+        except ValueError:
+            pass
+
+        try:
+            epoch = int(time.mktime(time.strptime(s, '%Y-%m-%d')))
+            return epoch
+        except ValueError:
+            pass
+
+        try:
+            epoch = int(time.mktime(time.strptime(s, '%Y-%m-%d %H:%M:%S')))
+            return epoch
+        except ValueError:
+            pass
+
+        raise ValueError('Invalid time: "%s"' % s)
+
+    def is_cidr(self, cidr):
+        try:
+            ip, netmask = cidr.split("/")
+        except:
+            return False
+        if not self.is_ip(ip):
+            return False
+        if int(netmask) < 24 or int(netmask) > 31:
+            print "Sorry. CIDR should between 24-31"
+            sys.exit(1)
+        return True
+    
+    def is_ip(self, ip):
+        try:
+            socket.inet_aton(ip)
+            return True
+        except socket.error:
+            return False
+
+    def genToken(self, path, key):
+        str = "%s%s" %(path, key)
+        return self.md5(str)
+
+    def md5(self, str):
+        m = hashlib.md5()
+        m.update(str)
+        return m.hexdigest()
+    
+        
+SORT_FIELD = ["time_last", "time_first", "count"]
+
+
+def usage():
+    s = StringIO()
+    s.write("Usage: %s [<rrset>|<flinyrdara>] [<domain>|<ip>] [type] [options]\n" %sys.argv[0])
+    s.write("\t./flint rrset www.360.cn\n")
+    s.write("\t./flint rdata 101.4.60.193 A\n")
+    s.write("\t./flint rrset 360.cn -l 100\n")
+    s.write("\t./flint rrset 360.cn --sort='time_first'\n")
+    s.seek(0)
+    return s.read()
+
+
+def parse_option():
+    parser = optparse.OptionParser(usage=usage())
+    parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False)
+    parser.add_option("-V", "--version", action="store_true", dest="version")
+    parser.add_option("-j", "--json", action="store_true", dest="json", default=False,
+                    help="output in json format")
+    parser.add_option("-l", "--limit", action="store", type="int", default=1000, dest="limit",
+                    help="limit number of results. [default: %default]")
+    parser.add_option("-s", "--sort", action="store", type="string", default="time_last", dest="sort",
+                    help="|".join(SORT_FIELD)+" [default: %default]")
+    parser.add_option("-R", "--reverse", dest="reverse", action="store_false", default=True,
+                    help="reverse sort")
+    parser.add_option("", "--before", dest="before", type="string", action="store", 
+                    help="only output results seen before this time")
+    parser.add_option("", "--after", dest="after", type="string", action="store", 
+                    help="only output results seen after this time")
+    return parser
+
+if __name__ == "__main__":
+
+    parser = parse_option()
+    options, args = parser.parse_args()
+
+    if options.version:
+        print "flint %s" %__VERSION__
+        sys.exit(0)
+
+    if len(args) <2:
+        parser.print_help()
+        sys.exit(1)
+
+    f_table = args[0]
+    if f_table not in FLINT_TABLES:
+       print "Table must be in %s" %("|".join(FLINT_TABLES))
+       sys.exit(1)
+
+    f_keyword = args[1]
+    
+    f_type = args[2] if len(args)>2 else None
+    if f_type is not None:
+       f_type = f_type.upper()
+       if f_type not in FLINT_TYPES.keys():
+           print "Type must be in %s" %("|".join(FLINT_TYPES))
+           sys.exit(1)
+
+    if options.sort not in FLINT_SORT_FIELD:
+        print "Sort field must be in %s" %("|".join(FLINT_SORT_FIELD))
+        sys.exit(1)
+        
+    flint = FlintClient(**options.__dict__) 
+    flint(f_table, f_keyword, f_type)
+
+    
+    
+
