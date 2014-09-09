@@ -238,8 +238,6 @@ class FlintClient(object):
         return m.hexdigest()
     
         
-SORT_FIELD = ["time_last", "time_first", "count"]
-
 
 def usage():
     s = StringIO()
@@ -261,7 +259,7 @@ def parse_option():
     parser.add_option("-l", "--limit", action="store", type="int", default=1000, dest="limit",
                     help="limit number of results. [default: %default]")
     parser.add_option("-s", "--sort", action="store", type="string", default="time_last", dest="sort",
-                    help="|".join(SORT_FIELD)+" [default: %default]")
+                    help="|".join(FLINT_SORT_FIELD)+" [default: %default]")
     parser.add_option("-R", "--reverse", dest="reverse", action="store_false", default=True,
                     help="reverse sort")
     parser.add_option("", "--before", dest="before", type="string", action="store", 
