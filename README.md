@@ -55,6 +55,6 @@ But we plan to support that in the near future.
 
 ## Apply Access
 
-Use this script to access our passivedns database, you should apply a api key first. 
-Please email passivedns@360.cn for more details.
+Use this script to access 360 passivedns database, you must modify the script and assign the API address and API key
+we allocated for you. How to apply a key? Please email passivedns@360.cn for more details.
 
