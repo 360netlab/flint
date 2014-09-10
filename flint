@@ -12,7 +12,7 @@ try:
 except ImportError:
     import simplejson as json
 
-__VERSION__ = "0.1.3"
+__VERSION__ = "0.1.4"
 
 __AUTHOR__ = "netlab@360.cn"
 
