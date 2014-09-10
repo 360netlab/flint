@@ -59,55 +59,44 @@ FLINT_TYPES = {
 
 class FlintClient(object):
 
-    TIMEOUT = 20
+    TIMEOUT = 30
 
-    def __init__(self, 
-                sort = 'time_last', 
-                reverse = False, 
-                json = False,
-                limit = 1000, 
-                before = None,
-                after = None, 
-                verbose = False, 
-                **kwargs):
-        self.sort = sort
-        self.reverse = reverse
-        self.json = json
-        self.limit = limit
-        self.before = before
-        self.after = after
+    def __init__(self, api, api_id, api_key, verbose = False):
+        self.api = API
+        self.api_id = API_ID
+        self.api_key = API_KEY
         self.verbose = verbose
 
-    def __call__(self, f_table, f_keyword, f_type):
-        getattr(self, f_table)(f_keyword, f_type)
+    def __call__(self, f_table, f_keyword, f_type, *args, **kwargs):
+        getattr(self, f_table)(f_keyword, f_type, *args, **kwargs)
 
-    def query(self, f_table, f_keyword, f_type = None, f_netmask = None):
-        path = "/api/%s/keyword/%s/count/%s/" %(f_table, f_keyword, self.limit)
+    def query(self, f_table, f_keyword, f_type = None, f_netmask = None, limit = 1000):
+        path = "/api/%s/keyword/%s/count/%s/" %(f_table, f_keyword, limit)
         if f_type is not None:
             path = "%srtype/%s/" %(path, FLINT_TYPES[f_type])
         if f_netmask is not None:
             path = "%smask/%s/" %(path, str(f_netmask))
-        if API.startswith("http://"):
-            url = "%s%s" %(API, path)
+        if self.api.startswith("http://"):
+            url = "%s%s" %(self.api, path)
         else:
-            url = "http://%s%s" %(API, path)
+            url = "http://%s%s" %(self.api, path)
 
         req = urllib2.Request(url)
         req.add_header('Accept', 'application/json')
-        if API_ID:
-            req.add_header('X-BashTokid', API_ID);
-        if API_KEY:
-            token = self.genToken(path,API_KEY)
+        if self.api_id:
+            req.add_header('X-BashTokid', self.api_id);
+        if self.api_key:
+            token = self.genToken(path, self.api_key)
             req.add_header('X-BashToken', token)
 
         try:
             http = urllib2.urlopen(req, timeout=self.TIMEOUT)
             resp = http.read()
         except socket.timeout:
-            print "api timeout. please try again"
+            print "[api timeout]: %s" %(url)
             sys.exit(1)
         except (urllib2.HTTPError, urllib2.URLError),e:
-            print "api access '%s' failed" %(url)
+            print "[api error]: %s" %(url)
             sys.exit(1)
 
         if self.verbose:
@@ -126,30 +115,33 @@ class FlintClient(object):
             sys.exit(1)
         return resp
 
-    def filter(self, resp):
-        resp = sorted(resp, key=lambda x:x[self.sort], reverse=self.reverse)
-        if self.before:
+    def filter(self, resp, sort, reverse, before, after):
+        resp = sorted(resp, key=lambda x:x[sort], reverse=reverse)
+        if before:
             try:
-                before = self.time_parse(self.before)
+                before = self.time_parse(before)
                 resp = filter(lambda x:x['time_first'] < before, resp)
             except ValueError, e:
                 print e
-        if self.after:
+        if after:
             try:
-                after = self.time_parse(self.after)
+                after = self.time_parse(after)
                 resp = filter(lambda x:x['time_last'] > after, resp)
             except ValueError,e:
                 print e
         return resp
 
 
-    def rrset(self, rrname, rrtype=None):
+    def rrset(self, rrname, rrtype=None, sort="time_last", reverse=False,
+                limit=1000, jsond=False, after=None, before=None, **kwargs):
+
         def _dump(rrname, rrtype, resp):
             s = StringIO()
             s.write("%s %s In rrset\n" %(rrname, rrtype or "All Type"))
             s.write("-------\n")
             for r in resp:
-                s.write("Record times: %s -- %s\n" %(self._timefmt(r['time_first']), self._timefmt(r['time_last'])))
+                s.write("Record times: %s -- %s\n" %(self._timefmt(r['time_first']), 
+                    self._timefmt(r['time_last'])))
                 s.write("Count: %d\n" %(int(r['count'])))
                 rdata = r['rdata'].rstrip(";").split(";")
                 for data in rdata:
@@ -159,10 +151,10 @@ class FlintClient(object):
             return s.read()
                 
 
-        resp = self.query("rrset", rrname, rrtype)
+        resp = self.query("rrset", rrname, rrtype, limit=limit)
         if resp:
-            resp = self.filter(resp)
-            if self.json:
+            resp = self.filter(resp, sort, reverse, before, after)
+            if jsond:
                 print json.dumps(resp)
                 return json.dumps(resp)
             else:
@@ -171,7 +163,8 @@ class FlintClient(object):
             print "Empty"
         
 
-    def rdata(self, rdata, rrtype=None):
+    def rdata(self, rdata, rrtype=None, limit=1000, jsond=False, **kwargs):
+
         def _dump(rdata, rrtype, resp):
             s = StringIO()
             s.write("%s %s In rdata\n" %(rdata, rrtype or "All Type"))
@@ -184,12 +177,12 @@ class FlintClient(object):
 
         if self.is_cidr(rdata):
             ip, netmask = rdata.split("/")    
-            resp = self.query("rdata", ip, rrtype, netmask)
+            resp = self.query("rdata", ip, rrtype, netmask, limit=limit)
         else:
-            resp = self.query("rdata", rdata, rrtype)
+            resp = self.query("rdata", rdata, rrtype, limit=limit)
 
         if resp:
-            if self.json:
+            if jsond:
                 print json.dumps(resp)
                 return json.dumps(resp)
             else:
@@ -270,7 +263,7 @@ def parse_option():
     parser = optparse.OptionParser(usage=usage())
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False)
     parser.add_option("-V", "--version", action="store_true", dest="version")
-    parser.add_option("-j", "--json", action="store_true", dest="json", default=False,
+    parser.add_option("-j", "--json", action="store_true", dest="jsond", default=False,
                     help="output in json format")
     parser.add_option("-l", "--limit", action="store", type="int", default=1000, dest="limit",
                     help="limit number of results. [default: %default]")
@@ -315,8 +308,8 @@ if __name__ == "__main__":
         print "Sort field must be in %s" %("|".join(FLINT_SORT_FIELD))
         sys.exit(1)
         
-    flint = FlintClient(**options.__dict__) 
-    flint(f_table, f_keyword, f_type)
+    flint = FlintClient(API, API_ID, API_KEY, options.verbose) 
+    flint(f_table, f_keyword, f_type, **options.__dict__)
 
     
     
