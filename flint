@@ -250,7 +250,7 @@ class FlintClient(object):
 
 def usage():
     s = StringIO()
-    s.write("Usage: %s [<rrset>|<flinyrdara>] [<domain>|<ip>] [type] [options]\n" %sys.argv[0])
+    s.write("Usage: %s [<rrset>|<rdata>] [<domain>|<ip>] [type] [options]\n" %sys.argv[0])
     s.write("\t./flint rrset www.360.cn\n")
     s.write("\t./flint rdata 101.4.60.193 A\n")
     s.write("\t./flint rrset 360.cn -l 100\n")
