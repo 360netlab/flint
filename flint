@@ -116,14 +116,13 @@ class FlintClient(object):
             print req.headers
             print "\n"
             print "Response:"
-            print resp
             print http.code
             print http.headers
 
         try:
             resp = json.loads(resp)
         except:
-            print "api error"
+            print resp
             sys.exit(1)
         return resp
 
@@ -145,7 +144,7 @@ class FlintClient(object):
 
 
     def rrset(self, rrname, rrtype=None):
-        def _print(rrname, rrtype, resp):
+        def _dump(rrname, rrtype, resp):
             s = StringIO()
             s.write("%s %s In rrset\n" %(rrname, rrtype or "All Type"))
             s.write("-------\n")
@@ -157,7 +156,7 @@ class FlintClient(object):
                     s.write("%s\t%s\t%s\n" %(r['rrname'], r['rrtype'], data))
                 s.write("\n")
             s.seek(0)
-            print s.read()
+            return s.read()
                 
 
         resp = self.query("rrset", rrname, rrtype)
@@ -167,15 +166,21 @@ class FlintClient(object):
                 print json.dumps(resp)
                 return json.dumps(resp)
             else:
-                _print(rrname, rrtype, resp)
+                print _dump(rrname, rrtype, resp)
         else:
             print "Empty"
         
 
     def rdata(self, rdata, rrtype=None):
-        def _print(rdata, rrtype, resp):
+        def _dump(rdata, rrtype, resp):
+            s = StringIO()
+            s.write("%s %s In rdata\n" %(rdata, rrtype or "All Type"))
+            s.write("--------\n")
             for r in resp:
-                print "%s\t%s\t%s" %(r['rrname'], r['rrtype'], r['rdata'])
+                s.write("%s\t%s\t%s" %(r['rrname'], r['rrtype'], r['rdata']))
+                s.write("\n")
+            s.seek(0)
+            return s.read()
 
         if self.is_cidr(rdata):
             ip, netmask = rdata.split("/")    
@@ -188,10 +193,9 @@ class FlintClient(object):
                 print json.dumps(resp)
                 return json.dumps(resp)
             else:
-                _print(rdata, rrtype, resp)
+                print _dump(rdata, rrtype, resp)
         else:
             print "Empty"
-
 
     def _timefmt(self, ts):
         try:
