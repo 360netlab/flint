@@ -16,12 +16,21 @@ __VERSION__ = "0.1.3"
 
 __AUTHOR__ = "netlab@360.cn"
 
+"""
+How to using this script?
 
+First. 
+    Email passivedns@360.cn to apply the API_ID & API_KEY
+Second. 
+    Assign the API_ID and API_KEY we allocated for you 
+"""
 
-#Contact passivedns@360.cn get the api address
-API = ""
+API = "netlab.360.cn"
 
-#You must assign the key we allocated for you.
+#This ID will be used as the identification by authentication system 
+API_ID = ""
+
+#This key is matched with API_ID, be used for calcuate message hash token.
 API_KEY = ""
 
 
@@ -82,8 +91,11 @@ class FlintClient(object):
             url = "%s%s" %(API, path)
         else:
             url = "http://%s%s" %(API, path)
+
         req = urllib2.Request(url)
         req.add_header('Accept', 'application/json')
+        if API_ID:
+            req.add_header('X-BashTokid', API_ID);
         if API_KEY:
             token = self.genToken(path,API_KEY)
             req.add_header('X-BashToken', token)
