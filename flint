@@ -12,7 +12,7 @@ try:
 except ImportError:
     import simplejson as json
 
-__VERSION__ = "0.1.4"
+__VERSION__ = "0.1.5"
 
 __AUTHOR__ = "netlab@360.cn"
 
@@ -93,11 +93,11 @@ class FlintClient(object):
             http = urllib2.urlopen(req, timeout=self.TIMEOUT)
             resp = http.read()
         except socket.timeout:
-            print "[api timeout]: %s" %(url)
-            sys.exit(1)
+            self.panic("[api timeout]: %s" %(url))
         except (urllib2.HTTPError, urllib2.URLError),e:
-            print "[api error]: %s" %(url)
-            sys.exit(1)
+            self.panic("[api error]: %s" %(url))
+
+        # resp = {'err':'asd', 'msg': 'asdajksdk'}
 
         if self.verbose:
             print "Request: "
@@ -111,8 +111,12 @@ class FlintClient(object):
         try:
             resp = json.loads(resp)
         except:
-            print resp
-            sys.exit(1)
+            self.panic(resp)
+
+        if isinstance(resp, dict):
+            if resp.has_key('err'):
+                self.panic("server exception: %s" %(resp['msg']))
+
         return resp
 
     def filter(self, resp, sort, reverse, before, after):
@@ -122,13 +126,13 @@ class FlintClient(object):
                 before = self.time_parse(before)
                 resp = filter(lambda x:x['time_first'] < before, resp)
             except ValueError, e:
-                print e
+                self.panic("filter error with before: %s", before)
         if after:
             try:
                 after = self.time_parse(after)
                 resp = filter(lambda x:x['time_last'] > after, resp)
             except ValueError,e:
-                print e
+                self.panic("filter error with after: %s", after)
         return resp
 
 
@@ -190,6 +194,10 @@ class FlintClient(object):
         else:
             print "Empty"
 
+    def panic(self, error):
+        sys.stderr.write("%s\n" %error)
+        sys.exit(1)
+
     def _timefmt(self, ts):
         try:
             return datetime.fromtimestamp(ts)
@@ -217,6 +225,7 @@ class FlintClient(object):
             pass
 
         raise ValueError('Invalid time: "%s"' % s)
+
 
     def is_cidr(self, cidr):
         try:
