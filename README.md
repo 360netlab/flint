@@ -29,6 +29,17 @@ Options:
   --after=AFTER         only output results seen after this time
 ```
 
+Some advanced features
+
+* rrset support subdomain match
+> flint rrset *.360.cn
+
+* rdata support CIDR formatting
+> flint rdata 106.120.167.66/24  
+
+notice: the netmask must be >=24
+
+
 ## Basic Example
 
 ```
