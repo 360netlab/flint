@@ -115,7 +115,7 @@ class FlintClient(object):
 
         if isinstance(resp, dict):
             if resp.has_key('err'):
-                self.panic("server exception: %s" %(resp['msg']))
+                self.panic("server exception: %s" %(resp.get('msg', '')))
 
         return resp
 
