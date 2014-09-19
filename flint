@@ -26,13 +26,13 @@ Second.
     Assign the API_ID and API_KEY we allocated for you 
 """
 
-API = ""
+API = "node002v.add.lyct.qihoo.net"
 
 #This ID will be used as the identification by authentication system 
-API_ID = ""
+API_ID = "domestic_inner_flint_keqiang"
 
 #This key is matched with API_ID, be used for calcuate message hash token.
-API_KEY = ""
+API_KEY = "gSA2Jk$FyorlrhYvhDE9WP./5kam.i"
 
 
 FLINT_TABLES = ['rrset', 'rdata']
@@ -107,7 +107,7 @@ class FlintClient(object):
                 return ret
 
             retry -= 1
-
+            print ">>> Retrying..."
             time.sleep(1)
             continue
 
@@ -170,13 +170,13 @@ class FlintClient(object):
         if before:
             try:
                 before = self.time_parse(before)
-                data = filter(lambda x:x['time_first'] < before, data)
+                data = filter(lambda x:x['time_last'] < before, data)
             except ValueError, e:
                 self.panic("filter error with before: %s", before)
         if after:
             try:
                 after = self.time_parse(after)
-                data = filter(lambda x:x['time_last'] > after, data)
+                data = filter(lambda x:x['time_first'] > after, data)
             except ValueError,e:
                 self.panic("filter error with after: %s", after)
         return data
@@ -204,7 +204,7 @@ class FlintClient(object):
 
         next = None
         while 1:
-            if isinstance(resp, dict):
+            if resp:
                 next = resp.headers.get("X-NextCall", None)
             if self.verbose:
                 print ">>> Get Next: ", next
@@ -241,7 +241,7 @@ class FlintClient(object):
         
         next = None
         while 1:
-            if isinstance(resp, dict):
+            if resp:
                 next = resp.headers.get("X-NextCall", None)
             if self.verbose:
                 print ">>> Get Next: ", next
