@@ -11,8 +11,9 @@ try:
     import json
 except ImportError:
     import simplejson as json
+import traceback
 
-__VERSION__ = "0.1.5"
+__VERSION__ = "0.1.6"
 
 __AUTHOR__ = "netlab@360.cn"
 
@@ -25,13 +26,13 @@ Second.
     Assign the API_ID and API_KEY we allocated for you 
 """
 
-API = "netlab.360.cn"
+API = "node002v.add.lyct.qihoo.net"
 
 #This ID will be used as the identification by authentication system 
-API_ID = ""
+API_ID = "domestic_inner_flint_keqiang"
 
 #This key is matched with API_ID, be used for calcuate message hash token.
-API_KEY = ""
+API_KEY = "gSA2Jk$FyorlrhYvhDE9WP./5kam.i"
 
 
 FLINT_TABLES = ['rrset', 'rdata']
@@ -70,7 +71,67 @@ class FlintClient(object):
     def __call__(self, f_table, f_keyword, f_type, *args, **kwargs):
         getattr(self, f_table)(f_keyword, f_type, *args, **kwargs)
 
-    def query(self, f_table, f_keyword, f_type = None, f_netmask = None, limit = 1000):
+
+    def _do_query(self, req):
+        def _safe_in_query(req):
+            try:
+                url  = req.get_full_url()
+                http = urllib2.urlopen(req, timeout=self.TIMEOUT)
+                resp = http.read()
+                if self.verbose:
+                    print "################"
+                    print "#### REQUEST ###"
+                    print "################"
+                    print url 
+                    print req.headers
+                    print 
+                    print "#################"
+                    print "#### RESPONSE ###"
+                    print "#################"
+                    print http.code
+                    print http.headers
+                    print resp[:100], "..." if len(resp) > 100 else resp
+                    print "============================================"
+                    print 
+                try:
+                    resp = json.loads(resp)
+                except Exception, e:
+                    self.panic(resp)
+
+                if isinstance(resp, dict) and 'err' in resp:
+                    msg = resp.get("msg", "") or resp.get("err", "")
+                    self.panic(">>> Server Exception: %s" % msg, False)
+                    return None
+
+                return resp
+            except socket.timeout:
+                self.panic("[api timeout]: %s" %(url))
+                return None
+            except (urllib2.HTTPError, urllib2.URLError),e:
+                self.panic("[api error]: %s" %(url))
+                return None
+        while 1:
+            ret = _safe_in_query(req)
+            if ret is not None:
+                return ret
+            time.sleep(1)
+            continue
+
+
+    def next_query(self, path):
+        url = "http://%s%s" %(self.api, path)
+        req = urllib2.Request(url)
+        req.add_header('Accept', 'application/json')
+        if self.api_id:
+            req.add_header('X-BashTokid', self.api_id);
+        if self.api_key:
+            token = self.genToken(path, self.api_key)
+            req.add_header('X-BashToken', token)
+
+        return self._do_query(req)
+
+
+    def query(self, f_table, f_keyword, f_type = None, f_netmask = None, limit = 100000000):
         path = "/api/%s/keyword/%s/count/%s/" %(f_table, f_keyword, limit)
         if f_type is not None:
             path = "%srtype/%s/" %(path, FLINT_TYPES[f_type])
@@ -89,35 +150,8 @@ class FlintClient(object):
             token = self.genToken(path, self.api_key)
             req.add_header('X-BashToken', token)
 
-        try:
-            http = urllib2.urlopen(req, timeout=self.TIMEOUT)
-            resp = http.read()
-        except socket.timeout:
-            self.panic("[api timeout]: %s" %(url))
-        except (urllib2.HTTPError, urllib2.URLError),e:
-            self.panic("[api error]: %s" %(url))
+        return self._do_query(req)
 
-        # resp = {'err':'asd', 'msg': 'asdajksdk'}
-
-        if self.verbose:
-            print "Request: "
-            print url
-            print req.headers
-            print "\n"
-            print "Response:"
-            print http.code
-            print http.headers
-
-        try:
-            resp = json.loads(resp)
-        except:
-            self.panic(resp)
-
-        if isinstance(resp, dict):
-            if resp.has_key('err'):
-                self.panic("server exception: %s" %(resp.get('msg', '')))
-
-        return resp
 
     def filter(self, resp, sort, reverse, before, after):
         resp = sorted(resp, key=lambda x:x[sort], reverse=reverse)
@@ -137,7 +171,7 @@ class FlintClient(object):
 
 
     def rrset(self, rrname, rrtype=None, sort="time_last", reverse=False,
-                limit=1000, jsond=False, after=None, before=None, **kwargs):
+                limit=100000000, jsond=False, after=None, before=None, **kwargs):
 
         def _dump(rrname, rrtype, resp):
             s = StringIO()
@@ -153,21 +187,28 @@ class FlintClient(object):
                 s.write("\n")
             s.seek(0)
             return s.read()
-                
 
         resp = self.query("rrset", rrname, rrtype, limit=limit)
-        if resp:
-            resp = self.filter(resp, sort, reverse, before, after)
-            if jsond:
-                print json.dumps(resp)
-                return json.dumps(resp)
-            else:
-                print _dump(rrname, rrtype, resp)
-        else:
-            print "Empty"
-        
+        while 1:
+            next = None
+            if isinstance(resp, dict):
+                next = resp.get("next_call", None)
+                resp = resp.get("data", [])
+            if self.verbose:
+                print ">>> Get Next: ", next
+            if resp:
+                resp = self.filter(resp, sort, reverse, before, after)
+                if jsond:
+                    print json.dumps(resp)
+                else:
+                    print _dump(rrname, rrtype, resp)
+            if not next:
+                print ">>> All Done"
+                break
+            resp = self.next_query(next)
 
-    def rdata(self, rdata, rrtype=None, limit=1000, jsond=False, **kwargs):
+
+    def rdata(self, rdata, rrtype=None, limit=100000000, jsond=False, **kwargs):
 
         def _dump(rdata, rrtype, resp):
             s = StringIO()
@@ -185,18 +226,28 @@ class FlintClient(object):
         else:
             resp = self.query("rdata", rdata, rrtype, limit=limit)
 
-        if resp:
-            if jsond:
-                print json.dumps(resp)
-                return json.dumps(resp)
-            else:
-                print _dump(rdata, rrtype, resp)
-        else:
-            print "Empty"
+        while 1:
+            next = None
+            if isinstance(resp, dict):
+                next = resp.get("next_call", None)
+                resp = resp.get("data", [])
+            if self.verbose:
+                print ">>> Get Next: ", next
+            if resp:
+                if jsond:
+                    print json.dumps(resp)
+                else:
+                    print _dump(rdata, rrtype, resp)
+            if not next:
+                print ">>> All Done"
+                break
+            resp = self.next_query(next)
 
-    def panic(self, error):
+
+    def panic(self, error, hard=True):
         sys.stderr.write("%s\n" %error)
-        sys.exit(1)
+        if hard: 
+            sys.exit(1)
 
     def _timefmt(self, ts):
         try:
@@ -235,8 +286,7 @@ class FlintClient(object):
         if not self.is_ip(ip):
             return False
         if int(netmask) < 24 or int(netmask) > 31:
-            print "Sorry. CIDR should between 24-31"
-            sys.exit(1)
+            self.panic("Sorry. CIDR should between 24-31")
         return True
     
     def is_ip(self, ip):
@@ -274,7 +324,7 @@ def parse_option():
     parser.add_option("-V", "--version", action="store_true", dest="version")
     parser.add_option("-j", "--json", action="store_true", dest="jsond", default=False,
                     help="output in json format")
-    parser.add_option("-l", "--limit", action="store", type="int", default=1000, dest="limit",
+    parser.add_option("-l", "--limit", action="store", type="int", default=100000000, dest="limit",
                     help="limit number of results. [default: %default]")
     parser.add_option("-s", "--sort", action="store", type="string", default="time_last", dest="sort",
                     help="|".join(FLINT_SORT_FIELD)+" [default: %default]")
@@ -301,7 +351,7 @@ if __name__ == "__main__":
 
     f_table = args[0]
     if f_table not in FLINT_TABLES:
-       print "Table must be in %s" %("|".join(FLINT_TABLES))
+       sys.stderr.write("Table must be in %s\n" %("|".join(FLINT_TABLES)))
        sys.exit(1)
 
     f_keyword = args[1]
@@ -310,15 +360,22 @@ if __name__ == "__main__":
     if f_type is not None:
        f_type = f_type.upper()
        if f_type not in FLINT_TYPES.keys():
-           print "Type must be in %s" %("|".join(FLINT_TYPES))
+           sys.stderr.write("Type must be in %s\n" %("|".join(FLINT_TYPES)))
            sys.exit(1)
 
     if options.sort not in FLINT_SORT_FIELD:
-        print "Sort field must be in %s" %("|".join(FLINT_SORT_FIELD))
+        sys.stderr.write("Sort field must be in %s\n" %("|".join(FLINT_SORT_FIELD)))
         sys.exit(1)
         
-    flint = FlintClient(API, API_ID, API_KEY, options.verbose) 
-    flint(f_table, f_keyword, f_type, **options.__dict__)
+    try:
+        flint = FlintClient(API, API_ID, API_KEY, options.verbose) 
+        flint(f_table, f_keyword, f_type, **options.__dict__)
+    except KeyboardInterrupt, e:
+        print ">>> User Interrupt."
+    except Exception, e:
+        sys.stderr.write("Client Exception")
+        sys.stderr.write(traceback.format_exc())
+
 
     
     
