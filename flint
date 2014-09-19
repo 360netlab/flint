@@ -1,5 +1,7 @@
 #!/usr/bin/python
 import sys
+import os
+import errno
 import socket
 import urllib2
 import hashlib
@@ -34,6 +36,7 @@ API_ID = ""
 #This key is matched with API_ID, be used for calcuate message hash token.
 API_KEY = ""
 
+DEFAULT_CONFIG_FILE = '/etc/flint.conf'
 
 FLINT_TABLES = ['rrset', 'rdata']
 
@@ -317,8 +320,30 @@ class FlintClient(object):
         m = hashlib.md5()
         m.update(str)
         return m.hexdigest()
-    
-        
+
+
+def parse_config(cfg_fname):
+    config = {}
+    cfg_files = filter(os.path.isfile,
+            (cfg_fname, os.path.expanduser('~/.flint.conf')))
+
+    if not cfg_files:
+        sys.stderr.write('flint: No config files found\n')
+        sys.exit(1)
+
+    for fname in cfg_files:
+        for line in open(fname):
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("#"):
+                continue
+            key, eq, val = line.partition('=')
+            key = key.strip()
+            val = val.strip().strip('"')
+            config[key] = val
+
+    return config
 
 def usage():
     s = StringIO()
@@ -335,6 +360,8 @@ def parse_option():
     parser = optparse.OptionParser(usage=usage())
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False)
     parser.add_option("-V", "--version", action="store_true", dest="version")
+    parser.add_option('-c', '--config', dest='config', type='string',
+                    help='config file', default=DEFAULT_CONFIG_FILE)
     parser.add_option("-j", "--json", action="store_true", dest="jsond", default=False,
                     help="output in json format")
     parser.add_option("-l", "--limit", action="store", type="int", default=1000, dest="limit",
@@ -379,6 +406,17 @@ if __name__ == "__main__":
     if options.sort not in FLINT_SORT_FIELD:
         sys.stderr.write("Sort field must be in %s\n" %("|".join(FLINT_SORT_FIELD)))
         sys.exit(1)
+
+    try:
+        config = parse_config(options.config)
+    except Exception, e:
+        sys.stderr.write("%s\n" %e.message)
+        sys.exit(1)
+
+    API = API or config.get("API", "")
+    API_ID = API_ID or config.get("API_ID","")
+    API_KEY = API_KEY or config.get("API_KEY", "")
+
         
     try:
         flint = FlintClient(API, API_ID, API_KEY, options.verbose) 
