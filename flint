@@ -26,13 +26,13 @@ Second.
     Assign the API_ID and API_KEY we allocated for you 
 """
 
-API = "node002v.add.lyct.qihoo.net"
+API = ""
 
 #This ID will be used as the identification by authentication system 
-API_ID = "domestic_inner_flint_keqiang"
+API_ID = ""
 
 #This key is matched with API_ID, be used for calcuate message hash token.
-API_KEY = "gSA2Jk$FyorlrhYvhDE9WP./5kam.i"
+API_KEY = ""
 
 
 FLINT_TABLES = ['rrset', 'rdata']
