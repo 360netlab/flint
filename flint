@@ -26,13 +26,13 @@ Second.
     Assign the API_ID and API_KEY we allocated for you 
 """
 
-API = "node002v.add.lyct.qihoo.net"
+API = ""
 
 #This ID will be used as the identification by authentication system 
-API_ID = "domestic_inner_flint_keqiang"
+API_ID = ""
 
 #This key is matched with API_ID, be used for calcuate message hash token.
-API_KEY = "gSA2Jk$FyorlrhYvhDE9WP./5kam.i"
+API_KEY = ""
 
 
 FLINT_TABLES = ['rrset', 'rdata']
@@ -62,6 +62,8 @@ class FlintClient(object):
 
     TIMEOUT = 30
 
+    MAX_RETRY = 5
+
     def __init__(self, api, api_id, api_key, verbose = False):
         self.api = API
         self.api_id = API_ID
@@ -72,66 +74,72 @@ class FlintClient(object):
         getattr(self, f_table)(f_keyword, f_type, *args, **kwargs)
 
 
-    def _do_query(self, req):
+    def _do_query(self, req, max_retry=0):
         def _safe_in_query(req):
             try:
                 url  = req.get_full_url()
-                http = urllib2.urlopen(req, timeout=self.TIMEOUT)
-                resp = http.read()
+                resp = urllib2.urlopen(req, timeout=self.TIMEOUT)
+                data = resp.read()
                 if self.verbose:
-                    print "################"
-                    print "#### REQUEST ###"
-                    print "################"
-                    print url 
-                    print req.headers
-                    print 
-                    print "#################"
-                    print "#### RESPONSE ###"
-                    print "#################"
-                    print http.code
-                    print http.headers
-                    print resp[:100], "..." if len(resp) > 100 else resp
-                    print "============================================"
-                    print 
+                    self.debug_info(req, resp, data)
                 try:
-                    resp = json.loads(resp)
+                    data = json.loads(data)
                 except Exception, e:
-                    self.panic(resp)
+                    self.panic(data)
 
-                if isinstance(resp, dict) and 'err' in resp:
-                    msg = resp.get("msg", "") or resp.get("err", "")
+                if isinstance(data, dict) and 'err' in data:
+                    msg = data.get("msg", "") or data.get("err", "")
                     self.panic(">>> Server Exception: %s" % msg, False)
                     return None
 
-                return resp
+                return (resp, data)
             except socket.timeout:
-                self.panic("[api timeout]: %s" %(url))
+                self.panic("[api timeout]: %s" %(url), False)
                 return None
             except (urllib2.HTTPError, urllib2.URLError),e:
                 self.panic("[api error]: %s" %(url))
                 return None
-        while 1:
+
+        retry = max_retry + 1
+        while (retry):
             ret = _safe_in_query(req)
             if ret is not None:
                 return ret
+
+            retry -= 1
+
             time.sleep(1)
             continue
+
+        return (None, None)
+
+
+    def debug_info(self, req, resp, data):
+        print "################"
+        print "#### REQUEST ###"
+        print "################"
+        print req.get_full_url() 
+        print req.headers
+        print
+        print "#################"
+        print "#### RESPONSE ###"
+        print "#################"
+        print resp.code
+        print resp.headers
+        print data[:100], "..." if len(data) > 100 else data
+        print "============================================"
+        print
 
 
     def next_query(self, path):
         url = "http://%s%s" %(self.api, path)
         req = urllib2.Request(url)
-        req.add_header('Accept', 'application/json')
-        if self.api_id:
-            req.add_header('X-BashTokid', self.api_id);
-        if self.api_key:
-            token = self.genToken(path, self.api_key)
-            req.add_header('X-BashToken', token)
+        req = self.setup_header(req, path)
 
-        return self._do_query(req)
+        return self._do_query(req, max_retry=self.MAX_RETRY)
 
 
-    def query(self, f_table, f_keyword, f_type = None, f_netmask = None, limit = 100000000):
+    def query(self, f_table, f_keyword, f_type = None, f_netmask = None, limit = 1000):
         path = "/api/%s/keyword/%s/count/%s/" %(f_table, f_keyword, limit)
         if f_type is not None:
             path = "%srtype/%s/" %(path, FLINT_TYPES[f_type])
@@ -143,78 +151,83 @@ class FlintClient(object):
             url = "http://%s%s" %(self.api, path)
 
         req = urllib2.Request(url)
+        req = self.setup_header(req, path)
+
+        return self._do_query(req, max_retry = self.MAX_RETRY)
+
+    def setup_header(self, req, path):
         req.add_header('Accept', 'application/json')
         if self.api_id:
             req.add_header('X-BashTokid', self.api_id);
         if self.api_key:
             token = self.genToken(path, self.api_key)
             req.add_header('X-BashToken', token)
+        return req
 
-        return self._do_query(req)
 
-
-    def filter(self, resp, sort, reverse, before, after):
-        resp = sorted(resp, key=lambda x:x[sort], reverse=reverse)
+    def filter(self, data, sort, reverse, before, after):
+        data = sorted(data, key=lambda x:x[sort], reverse=reverse)
         if before:
             try:
                 before = self.time_parse(before)
-                resp = filter(lambda x:x['time_first'] < before, resp)
+                data = filter(lambda x:x['time_first'] < before, data)
             except ValueError, e:
                 self.panic("filter error with before: %s", before)
         if after:
             try:
                 after = self.time_parse(after)
-                resp = filter(lambda x:x['time_last'] > after, resp)
+                data = filter(lambda x:x['time_last'] > after, data)
             except ValueError,e:
                 self.panic("filter error with after: %s", after)
-        return resp
+        return data
 
 
     def rrset(self, rrname, rrtype=None, sort="time_last", reverse=False,
-                limit=100000000, jsond=False, after=None, before=None, **kwargs):
+                limit=1000, jsond=False, after=None, before=None, **kwargs):
 
-        def _dump(rrname, rrtype, resp):
+        def _dump(rrname, rrtype, data):
             s = StringIO()
             s.write("%s %s In rrset\n" %(rrname, rrtype or "All Type"))
             s.write("-------\n")
-            for r in resp:
+            for r in data:
                 s.write("Record times: %s -- %s\n" %(self._timefmt(r['time_first']), 
                     self._timefmt(r['time_last'])))
                 s.write("Count: %d\n" %(int(r['count'])))
                 rdata = r['rdata'].rstrip(";").split(";")
-                for data in rdata:
-                    s.write("%s\t%s\t%s\n" %(r['rrname'], r['rrtype'], data))
+                for rd in rdata:
+                    s.write("%s\t%s\t%s\n" %(r['rrname'], r['rrtype'], rd))
                 s.write("\n")
             s.seek(0)
             return s.read()
 
-        resp = self.query("rrset", rrname, rrtype, limit=limit)
+        resp, data = self.query("rrset", rrname, rrtype, limit=limit)
+
+        next = None
         while 1:
-            next = None
             if isinstance(resp, dict):
-                next = resp.get("next_call", None)
-                resp = resp.get("data", [])
+                next = resp.headers.get("X-NextCall", None)
             if self.verbose:
                 print ">>> Get Next: ", next
-            if resp:
-                resp = self.filter(resp, sort, reverse, before, after)
+                print ">>> Cur Nums: ", resp.headers.get("X-BatchCnt", "unknown")
+            if data:
+                data = self.filter(data, sort, reverse, before, after)
                 if jsond:
-                    print json.dumps(resp)
+                    print json.dumps(data)
                 else:
-                    print _dump(rrname, rrtype, resp)
+                    print _dump(rrname, rrtype, data)
             if not next:
                 print ">>> All Done"
                 break
-            resp = self.next_query(next)
+            resp, data = self.next_query(next)
 
 
-    def rdata(self, rdata, rrtype=None, limit=100000000, jsond=False, **kwargs):
+    def rdata(self, rdata, rrtype=None, limit=1000, jsond=False, **kwargs):
 
-        def _dump(rdata, rrtype, resp):
+        def _dump(rdata, rrtype, data):
             s = StringIO()
             s.write("%s %s In rdata\n" %(rdata, rrtype or "All Type"))
             s.write("--------\n")
-            for r in resp:
+            for r in data:
                 s.write("%s\t%s\t%s" %(r['rrname'], r['rrtype'], r['rdata']))
                 s.write("\n")
             s.seek(0)
@@ -222,26 +235,26 @@ class FlintClient(object):
 
         if self.is_cidr(rdata):
             ip, netmask = rdata.split("/")    
-            resp = self.query("rdata", ip, rrtype, netmask, limit=limit)
+            resp, data = self.query("rdata", ip, rrtype, netmask, limit=limit)
         else:
-            resp = self.query("rdata", rdata, rrtype, limit=limit)
-
+            resp, data = self.query("rdata", rdata, rrtype, limit=limit)
+        
+        next = None
         while 1:
-            next = None
             if isinstance(resp, dict):
-                next = resp.get("next_call", None)
-                resp = resp.get("data", [])
+                next = resp.headers.get("X-NextCall", None)
             if self.verbose:
                 print ">>> Get Next: ", next
-            if resp:
+                print ">>> Cur Nums: ", resp.headers.get("X-BatchCnt", "unknown")
+            if data:
                 if jsond:
-                    print json.dumps(resp)
+                    print json.dumps(data)
                 else:
-                    print _dump(rdata, rrtype, resp)
+                    print _dump(rdata, rrtype, data)
             if not next:
                 print ">>> All Done"
                 break
-            resp = self.next_query(next)
+            resp, data = self.next_query(next)
 
 
     def panic(self, error, hard=True):
@@ -324,7 +337,7 @@ def parse_option():
     parser.add_option("-V", "--version", action="store_true", dest="version")
     parser.add_option("-j", "--json", action="store_true", dest="jsond", default=False,
                     help="output in json format")
-    parser.add_option("-l", "--limit", action="store", type="int", default=100000000, dest="limit",
+    parser.add_option("-l", "--limit", action="store", type="int", default=1000, dest="limit",
                     help="limit number of results. [default: %default]")
     parser.add_option("-s", "--sort", action="store", type="string", default="time_last", dest="sort",
                     help="|".join(FLINT_SORT_FIELD)+" [default: %default]")
