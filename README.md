@@ -2,7 +2,7 @@ flint
 =====
 
 flint is a advanced python client for 360 passivedns HTTP API.   
-The url of web interface is http://netlab.360.cn
+The url of web interface is http://www.passivedns.cn
 
 
 
