@@ -9,7 +9,7 @@ The url of web interface is http://www.passivedns.cn
 ## Usage
 
 ```
-Usage: ./flint [<rrset>|<flinyrdara>] [<domain>|<ip>] [type] [options]
+Usage: ./flint [<rrset>|<rdata>] [<domain>|<ip>] [type] [options]
     ./flint rrset www.360.cn
     ./flint rdata 101.4.60.193 A
     ./flint rrset 360.cn -l 100
