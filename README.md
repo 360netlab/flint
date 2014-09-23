@@ -40,24 +40,38 @@ Some advanced features
 notice: the netmask must be >=24
 
 
-## Basic Example
+## basic rrset query example
 
 ```
 $ flint rrset 360.cn A
-
 360.cn A In rrset
 -------
-Record times: 2014-08-06 20:39:07 -- 2014-09-06 13:37:52
-Count: 522
-360.cn  A   101.4.60.193
+Record times: 2014-08-05 15:21:23 -- 2014-09-23 12:39:22
+Count: 1793790
+360.cn  A       111.206.61.131
 
-Record times: 2014-08-05 21:21:39 -- 2014-09-06 12:14:38
-Count: 4637054
-360.cn  A   106.120.167.66
+Record times: 2014-08-06 14:39:07 -- 2014-09-23 11:31:12
+Count: 801
+360.cn  A       101.4.60.193
 
-Record times: 2014-08-05 21:21:23 -- 2014-09-06 12:06:11
-Count: 1688982
-360.cn  A   111.206.61.131
+Record times: 2014-08-05 15:21:39 -- 2014-09-23 11:24:23
+Count: 4758929
+360.cn  A       106.120.167.66
+
+
+>>> All Done
+```
+
+## basic rdata query example
+
+```
+$ flint rdata 101.4.60.193
+101.4.60.193 All Type In rdata
+--------
+360.cn          101.4.60.193    2014-09-23 11:31:12
+www.360.cn      101.4.60.193    2014-09-23 10:20:28
+
+>>> All Done
 ```
 
 please notice: The output format is not yet completely compliant with the
