@@ -209,7 +209,7 @@ class FlintClient(object):
             if data:
                 data = self.filter(data, sort, reverse, before, after)
                 if jsond:
-                    print json.dumps(data, sort_keys=True, indent=4, separators=(',', ': '))
+                    print json.dumps(data, sort_keys=False, indent=4, separators=(',', ': '))
                 else:
                     print _dump(rrname, rrtype, data)
             if not next:
