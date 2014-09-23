@@ -220,11 +220,16 @@ class FlintClient(object):
     def rdata(self, rdata, rrtype=None, limit=1000, jsond=False, **kwargs):
 
         def _dump(rdata, rrtype, data):
+            maxwidth = 0  # find the maximum width of an rrset to prevent ugly formatting
+            for r in data:
+                if len(r['rrname']) > maxwidth:
+                    maxwidth = len(r['rrname'])
+
             s = StringIO()
             s.write("%s %s In rdata\n" %(rdata, rrtype or "All Type"))
             s.write("--------\n")
             for r in data:
-                s.write("%s\t%s\t%s\t%s" %(r['rrname'], r['rrtype'], r['rdata'], self._timefmt(r['time_last'])))
+                s.write('{:{fill}<{width}}\t{}\t{}'.format(r['rrname'], r['rdata'],  self._timefmt(r['time_last']), fill=' ', width=maxwidth))
                 s.write("\n")
             s.seek(0)
             return s.read()
