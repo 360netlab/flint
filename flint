@@ -76,7 +76,6 @@ class FlintClient(object):
     def __call__(self, f_table, f_keyword, f_type, *args, **kwargs):
         getattr(self, f_table)(f_keyword, f_type, *args, **kwargs)
 
-
     def _do_query(self, req, max_retry=0):
         def _safe_in_query(req):
             try:
@@ -116,7 +115,6 @@ class FlintClient(object):
 
         return (None, None)
 
-
     def debug_info(self, req, resp, data):
         print "################"
         print "#### REQUEST ###"
@@ -133,14 +131,12 @@ class FlintClient(object):
         print "============================================"
         print
 
-
     def next_query(self, path):
         url = "http://%s%s" %(self.api, path)
         req = urllib2.Request(url)
         req = self.setup_header(req, path)
 
         return self._do_query(req, max_retry=self.MAX_RETRY)
-
 
     def query(self, f_table, f_keyword, f_type = None, f_netmask = None, limit = 1000):
         path = "/api/%s/keyword/%s/count/%s/" %(f_table, f_keyword, limit)
@@ -267,7 +263,7 @@ class FlintClient(object):
         except:
             return ""
 
-    #This function is copy from dnsdb-query
+    #This function is copied from dnsdb-query
     def time_parse(self, s):
         try:
             epoch = int(s)
@@ -372,6 +368,7 @@ def parse_option():
                     help="only output results seen after this time")
     return parser
 
+
 if __name__ == "__main__":
 
     parser = parse_option()
@@ -421,8 +418,3 @@ if __name__ == "__main__":
     except Exception, e:
         sys.stderr.write("Client Exception")
         sys.stderr.write(traceback.format_exc())
-
-
-    
-    
-
