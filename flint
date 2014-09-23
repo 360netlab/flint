@@ -15,9 +15,9 @@ except ImportError:
     import simplejson as json
 import traceback
 
-__VERSION__ = "0.1.6"
+__VERSION__ = "0.1.7"
 
-__AUTHOR__ = "netlab@360.cn"
+__AUTHOR__ = "netlab@360.cn" # All original credit to netlab@360.cn. Fork changes by x123@users.noreply.github.com
 
 """
 How to using this script?
