@@ -244,7 +244,8 @@ class FlintClient(object):
                 print ">>> Cur Nums: ", resp.headers.get("X-BatchCnt", "unknown")
             if data:
                 if jsond:
-                    print json.dumps(data)
+                    print 'here2'
+                    print json.dumps(data, sort_keys=False, indent=4, separators=(',', ': '))
                 else:
                     print _dump(rdata, rrtype, data)
             if not next:
