@@ -40,7 +40,7 @@ Some advanced features
 notice: the netmask must be >=24
 
 
-## Basic Example
+## Output
 
 ```
 $ flint rrset 360.cn A
