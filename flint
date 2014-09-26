@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 import sys
 import os
 import errno
@@ -15,9 +15,9 @@ except ImportError:
     import simplejson as json
 import traceback
 
-__VERSION__ = "0.1.6"
+__VERSION__ = "0.1.7"
 
-__AUTHOR__ = "netlab@360.cn"
+__AUTHOR__ = "netlab@360.cn" # All original credit to netlab@360.cn. Fork changes by x123@users.noreply.github.com
 
 """
 How to using this script?
@@ -76,7 +76,6 @@ class FlintClient(object):
     def __call__(self, f_table, f_keyword, f_type, *args, **kwargs):
         getattr(self, f_table)(f_keyword, f_type, *args, **kwargs)
 
-
     def _do_query(self, req, max_retry=0):
         def _safe_in_query(req):
             try:
@@ -116,7 +115,6 @@ class FlintClient(object):
 
         return (None, None)
 
-
     def debug_info(self, req, resp, data):
         print "################"
         print "#### REQUEST ###"
@@ -133,14 +131,12 @@ class FlintClient(object):
         print "============================================"
         print
 
-
     def next_query(self, path):
         url = "http://%s%s" %(self.api, path)
         req = urllib2.Request(url)
         req = self.setup_header(req, path)
 
         return self._do_query(req, max_retry=self.MAX_RETRY)
-
 
     def query(self, f_table, f_keyword, f_type = None, f_netmask = None, limit = 1000):
         path = "/api/%s/keyword/%s/count/%s/" %(f_table, f_keyword, limit)
@@ -167,7 +163,6 @@ class FlintClient(object):
             req.add_header('X-BashToken', token)
         return req
 
-
     def filter(self, data, sort, reverse, before, after):
         data = sorted(data, key=lambda x:x[sort], reverse=reverse)
         if before:
@@ -183,7 +178,6 @@ class FlintClient(object):
             except ValueError,e:
                 self.panic("filter error with after: %s", after)
         return data
-
 
     def rrset(self, rrname, rrtype=None, sort="time_last", reverse=False,
                 limit=1000, jsond=False, after=None, before=None, **kwargs):
@@ -215,7 +209,7 @@ class FlintClient(object):
             if data:
                 data = self.filter(data, sort, reverse, before, after)
                 if jsond:
-                    print json.dumps(data)
+                    print json.dumps(data, sort_keys=False, indent=4, separators=(',', ': '))
                 else:
                     print _dump(rrname, rrtype, data)
             if not next:
@@ -223,15 +217,19 @@ class FlintClient(object):
                 break
             resp, data = self.next_query(next)
 
-
     def rdata(self, rdata, rrtype=None, limit=1000, jsond=False, **kwargs):
 
         def _dump(rdata, rrtype, data):
+            maxwidth = 0  # find the maximum width of an rrset to prevent ugly formatting
+            for r in data:
+                if len(r['rrname']) > maxwidth:
+                    maxwidth = len(r['rrname'])
+
             s = StringIO()
             s.write("%s %s In rdata\n" %(rdata, rrtype or "All Type"))
             s.write("--------\n")
             for r in data:
-                s.write("%s\t%s\t%s" %(r['rrname'], r['rrtype'], r['rdata']))
+                s.write('{:{fill}<{width}}\t{}\t{}'.format(r['rrname'], r['rdata'],  self._timefmt(r['time_last']), fill=' ', width=maxwidth))
                 s.write("\n")
             s.seek(0)
             return s.read()
@@ -251,14 +249,13 @@ class FlintClient(object):
                 print ">>> Cur Nums: ", resp.headers.get("X-BatchCnt", "unknown")
             if data:
                 if jsond:
-                    print json.dumps(data)
+                    print json.dumps(data, sort_keys=False, indent=4, separators=(',', ': '))
                 else:
                     print _dump(rdata, rrtype, data)
             if not next:
                 print ">>> All Done"
                 break
             resp, data = self.next_query(next)
-
 
     def panic(self, error, hard=True):
         sys.stderr.write("%s\n" %error)
@@ -271,7 +268,7 @@ class FlintClient(object):
         except:
             return ""
 
-    #This function is copy from dnsdb-query
+    #This function is copied from dnsdb-query
     def time_parse(self, s):
         try:
             epoch = int(s)
@@ -292,7 +289,6 @@ class FlintClient(object):
             pass
 
         raise ValueError('Invalid time: "%s"' % s)
-
 
     def is_cidr(self, cidr):
         try:
@@ -345,6 +341,7 @@ def parse_config(cfg_fname):
 
     return config
 
+
 def usage():
     s = StringIO()
     s.write("Usage: %s [<rrset>|<rdata>] [<domain>|<ip>] [type] [options]\n" %sys.argv[0])
@@ -375,6 +372,7 @@ def parse_option():
     parser.add_option("", "--after", dest="after", type="string", action="store", 
                     help="only output results seen after this time")
     return parser
+
 
 if __name__ == "__main__":
 
@@ -417,7 +415,6 @@ if __name__ == "__main__":
     API_ID = API_ID or config.get("API_ID","")
     API_KEY = API_KEY or config.get("API_KEY", "")
 
-        
     try:
         flint = FlintClient(API, API_ID, API_KEY, options.verbose) 
         flint(f_table, f_keyword, f_type, **options.__dict__)
@@ -426,8 +423,3 @@ if __name__ == "__main__":
     except Exception, e:
         sys.stderr.write("Client Exception")
         sys.stderr.write(traceback.format_exc())
-
-
-    
-    
-
