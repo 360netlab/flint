@@ -2,7 +2,7 @@ flint
 =====
 
 flint is a advanced python client for 360 passivedns HTTP API.   
-The url of web interface is http://www.passivedns.cn
+The associated web interface is http://www.passivedns.cn
 
 
 
@@ -41,6 +41,7 @@ notice: the netmask must be >=24
 
 
 ## basic rrset query example
+=======
 
 ```
 $ flint rrset 360.cn A
