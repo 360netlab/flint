@@ -68,9 +68,9 @@ class FlintClient(object):
     MAX_RETRY = 5
 
     def __init__(self, api, api_id, api_key, verbose = False):
-        self.api = API
-        self.api_id = API_ID
-        self.api_key = API_KEY
+        self.api = api
+        self.api_id = api_id
+        self.api_key = api_key
         self.verbose = verbose
 
     def __call__(self, f_table, f_keyword, f_type, *args, **kwargs):
