@@ -17,7 +17,7 @@ import traceback
 
 __VERSION__ = "0.1.7"
 
-__AUTHOR__ = "netlab@360.cn" # All original credit to netlab@360.cn. Fork changes by x123@users.noreply.github.com
+__AUTHOR__ = "passivedns@360.cn" # All original credit to passivedns@360.cn. Fork changes by x123@users.noreply.github.com
 
 """
 How to using this script?
@@ -324,20 +324,22 @@ def parse_config(cfg_fname):
             (cfg_fname, os.path.expanduser('~/.flint.conf')))
 
     if not cfg_files:
-        sys.stderr.write('flint: No config files found\n')
-        sys.exit(1)
+        raise Exception("No config file found")
 
-    for fname in cfg_files:
-        for line in open(fname):
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith("#"):
-                continue
-            key, eq, val = line.partition('=')
-            key = key.strip()
-            val = val.strip().strip('"')
-            config[key] = val
+    try:
+        for fname in cfg_files:
+            for line in open(fname):
+                line = line.strip()
+                if not line:
+                    continue
+                if line.startswith("#"):
+                    continue
+                key, eq, val = line.partition('=')
+                key = key.strip()
+                val = val.strip().strip('"')
+                config[key] = val
+    except:
+        raise Exception("Config file '%s' parse error", cfg_fname)
 
     return config
 
