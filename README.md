@@ -10,42 +10,6 @@ The associated web interface is http://www.passivedns.cn
 2. Modify the flint.conf use the API_KEY and API_ID we allocate for you
 3. Copy flint.conf to ~/.flint.conf or /etc/flint.conf
 
-
-
-## Features
-
-```
-Usage: ./flint [<rrset>|<rdata>] [<domain>|<ip>] [type] [options]
-    ./flint rrset www.360.cn
-    ./flint rdata 101.4.60.193 A
-    ./flint rrset 360.cn -l 100
-    ./flint rrset 360.cn --sort='time_first'
-
-
-Options:
-  -h, --help            show this help message and exit
-  -v, --verbose
-  -V, --version
-  -j, --json            output in json format
-  -l LIMIT, --limit=LIMIT
-                        limit number of results. [default: 1000]
-  -s SORT, --sort=SORT  time_last|time_first|count [default: time_last]
-  -R, --reverse         reverse sort
-  --before=BEFORE       only output results seen before this time
-  --after=AFTER         only output results seen after this time
-```
-
-Some advanced features
-
-* rrset support subdomain match
-> flint rrset *.360.cn
-
-* rdata support CIDR formatting
-> flint rdata 106.120.167.66/24  
-
-notice: the netmask must be >=24
-
-
 ## basic rrset query example
 =======
 
@@ -80,6 +44,40 @@ www.360.cn      101.4.60.193    2014-09-23 10:20:28
 
 >>> All Done
 ```
+
+## Features
+
+```
+Usage: ./flint [<rrset>|<rdata>] [<domain>|<ip>] [type] [options]
+    ./flint rrset www.360.cn
+    ./flint rdata 101.4.60.193 A
+    ./flint rrset 360.cn -l 100
+    ./flint rrset 360.cn --sort='time_first'
+
+
+Options:
+  -h, --help            show this help message and exit
+  -v, --verbose
+  -V, --version
+  -j, --json            output in json format
+  -l LIMIT, --limit=LIMIT
+                        limit number of results. [default: 1000]
+  -s SORT, --sort=SORT  time_last|time_first|count [default: time_last]
+  -R, --reverse         reverse sort
+  --before=BEFORE       only output results seen before this time
+  --after=AFTER         only output results seen after this time
+```
+
+Some advanced features
+
+* rrset support subdomain match
+> flint rrset *.360.cn
+
+* rdata support CIDR formatting
+> flint rdata 106.120.167.66/24  
+
+notice: the netmask must be >=24
+
 
 please notice: The output format is not yet completely compliant with the
 [Passive DNS Common Output Format](http://tools.ietf.org/html/draft-dulaunoy-kaplan-passive-dns-cof-01).
