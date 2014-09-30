@@ -4,9 +4,15 @@ flint
 flint is a advanced python client for 360 passivedns HTTP API.   
 The associated web interface is http://www.passivedns.cn
 
-
-
 ## Usage
+
+1. Email passivedns@360.cn to apply the API_ID & API_KEY
+2. Modify the flint.conf use the API_KEY and API_ID we allocate for you
+3. Copy flint.conf to ~/.flint.conf or /etc/flint.conf
+
+
+
+## Features
 
 ```
 Usage: ./flint [<rrset>|<rdata>] [<domain>|<ip>] [type] [options]
