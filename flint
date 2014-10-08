@@ -20,7 +20,7 @@ __VERSION__ = "0.1.7"
 __AUTHOR__ = "passivedns@360.cn" # All original credit to passivedns@360.cn. Fork changes by x123@users.noreply.github.com
 
 
-API = ""
+API = "www.passivedns.cn"
 
 #This ID will be used as the identification by authentication system 
 API_ID = ""
@@ -343,6 +343,7 @@ def usage():
     s.write("\t./flint rdata 101.4.60.193 A\n")
     s.write("\t./flint rrset 360.cn -l 100\n")
     s.write("\t./flint rrset 360.cn --sort='time_first'\n")
+    s.write("\t./flint rrset 360.cn --before='2014-10-01' --after='2014-08-01 13:12:21'\n")
     s.seek(0)
     return s.read()
 

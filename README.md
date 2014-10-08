@@ -4,11 +4,6 @@ flint
 flint is a advanced python client for 360 passivedns HTTP API.   
 The associated web interface is http://www.passivedns.cn
 
-## Usage
-
-1. Email passivedns@360.cn to apply the API_ID & API_KEY
-2. Modify the flint.conf use the API_KEY and API_ID we allocate for you
-3. Copy flint.conf to ~/.flint.conf or /etc/flint.conf
 
 ## basic rrset query example
 =======
@@ -45,7 +40,7 @@ www.360.cn      101.4.60.193    2014-09-23 10:20:28
 >>> All Done
 ```
 
-## Features
+## Usage
 
 ```
 Usage: ./flint [<rrset>|<rdata>] [<domain>|<ip>] [type] [options]
@@ -53,6 +48,7 @@ Usage: ./flint [<rrset>|<rdata>] [<domain>|<ip>] [type] [options]
     ./flint rdata 101.4.60.193 A
     ./flint rrset 360.cn -l 100
     ./flint rrset 360.cn --sort='time_first'
+    ./flint rrset 360.cn --before='2014-10-01' --after='2014-08-01 13:12:21'
 
 
 Options:
@@ -68,23 +64,45 @@ Options:
   --after=AFTER         only output results seen after this time
 ```
 
-Some advanced features
+rrset and rdata support some advanced grammer in use
 
-* rrset support subdomain match
-> flint rrset *.360.cn
-
-* rdata support CIDR formatting
-> flint rdata 106.120.167.66/24  
-
-notice: the netmask must be >=24
+#### rrset
+subdomain match
+>flint rrset *.360.cn
 
 
-please notice: The output format is not yet completely compliant with the
-[Passive DNS Common Output Format](http://tools.ietf.org/html/draft-dulaunoy-kaplan-passive-dns-cof-01).
-But we plan to support that in the near future.
+sort
+>flint rrset 360.cn -s count
 
-## Apply Access
+  sort filed support: time_first, time_last, count
 
-Use this script to access 360 passivedns database, you must modify the script and assign the API address and API key
-we allocated for you. How to apply a key? Please email passivedns@360.cn for more details.
+reverse sort
+>flint rrset 360.cn -s count -R
+
+filter as first_seen and last_seen
+>flint rrset 360.cn --before='2014-10-01' --after='2014-09-01 13:12:21'
+
+before and after support three date format: 
+
+  * 2014-09-03
+  * 2014-09-03 21:00:00
+  * 1408107600 (utc timestamp)
+
+#### rdata
+CIDR formatting
+>flint rdata 106.120.167.66/24  
+
+the netmask must be >=24
+
+
+
+## How to run this script
+
+Use this script to access 360 passivedns database, you must apply an api authentication key first.
+
+1. Email passivedns@360.cn to apply the API_ID & API_KEY
+2. Modify the flint.conf use the API_KEY and API_ID we allocate for you
+3. Copy flint.conf to ~/.flint.conf or /etc/flint.conf
+
+
 
