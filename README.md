@@ -80,12 +80,12 @@ reverse sort
 >flint rrset 360.cn -s count -R
 
 filter as first_seen and last_seen
->flint rrset 360.cn --before='2014-10-01' --after='2014-09-01 13:12:21'
+>flint rrset 360.cn --before='2014-10-01' --after='2014-08-01 13:12:21'
 
 before and after support three date format: 
 
-  * 2014-09-03
-  * 2014-09-03 21:00:00
+  * 2014-08-01
+  * 2014-08-01 13:12:21
   * 1408107600 (utc timestamp)
 
 #### rdata
