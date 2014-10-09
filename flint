@@ -20,7 +20,7 @@ __VERSION__ = "0.1.7"
 __AUTHOR__ = "passivedns@360.cn" # All original credit to passivedns@360.cn. Fork changes by x123@users.noreply.github.com
 
 
-API = "www.passivedns.cn"
+API = ""
 
 #This ID will be used as the identification by authentication system 
 API_ID = ""
@@ -130,8 +130,8 @@ class FlintClient(object):
 
         return self._do_query(req, max_retry=self.MAX_RETRY)
 
-    def query(self, f_table, f_keyword, f_type = None, f_netmask = None, limit = 1000):
-        path = "/api/%s/keyword/%s/count/%s/" %(f_table, f_keyword, limit)
+    def query(self, f_table, f_keyword, f_type = None, f_netmask = None):
+        path = "/api/%s/keyword/%s/" %(f_table, f_keyword)
         if f_type is not None:
             path = "%srtype/%s/" %(path, FLINT_TYPES[f_type])
         if f_netmask is not None:
@@ -189,9 +189,10 @@ class FlintClient(object):
             s.seek(0)
             return s.read()
 
-        resp, data = self.query("rrset", rrname, rrtype, limit=limit)
+        resp, data = self.query("rrset", rrname, rrtype)
 
         next = None
+        count = 0
         while 1:
             if resp:
                 next = resp.headers.get("X-NextCall", None)
@@ -200,12 +201,17 @@ class FlintClient(object):
                 print ">>> Cur Nums: ", resp.headers.get("X-BatchCnt", "unknown")
             if data:
                 data = self.filter(data, sort, reverse, before, after)
+                if count < limit:
+                    rest = limit - count
+                    data = data[:rest]
+                    count += len(data)
                 if jsond:
                     print json.dumps(data, sort_keys=False, indent=4, separators=(',', ': '))
                 else:
                     print _dump(rrname, rrtype, data)
             if not next:
-                print ">>> All Done"
+                break
+            if count >= limit:
                 break
             resp, data = self.next_query(next)
 
@@ -228,11 +234,12 @@ class FlintClient(object):
 
         if self.is_cidr(rdata):
             ip, netmask = rdata.split("/")    
-            resp, data = self.query("rdata", ip, rrtype, netmask, limit=limit)
+            resp, data = self.query("rdata", ip, rrtype, netmask)
         else:
-            resp, data = self.query("rdata", rdata, rrtype, limit=limit)
+            resp, data = self.query("rdata", rdata, rrtype)
         
         next = None
+        count = 0
         while 1:
             if resp:
                 next = resp.headers.get("X-NextCall", None)
@@ -240,12 +247,17 @@ class FlintClient(object):
                 print ">>> Get Next: ", next
                 print ">>> Cur Nums: ", resp.headers.get("X-BatchCnt", "unknown")
             if data:
+                if count < limit:
+                    rest = limit - count
+                    data = data[:rest]
+                    count += len(data)
                 if jsond:
                     print json.dumps(data, sort_keys=False, indent=4, separators=(',', ': '))
                 else:
                     print _dump(rdata, rrtype, data)
             if not next:
-                print ">>> All Done"
+                break
+            if count >= limit:
                 break
             resp, data = self.next_query(next)
 
