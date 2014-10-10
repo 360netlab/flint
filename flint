@@ -227,7 +227,7 @@ class FlintClient(object):
             s.write("%s %s In rdata\n" %(rdata, rrtype or "All Type"))
             s.write("--------\n")
             for r in data:
-                s.write('{:{fill}<{width}}\t{}\t{}'.format(r['rrname'], r['rdata'],  self._timefmt(r['time_last']), fill=' ', width=maxwidth))
+                s.write('{0:{fill}<{width}}\t{1}\t{2}'.format(r['rrname'], r['rdata'],  self._timefmt(r['time_last']), fill=' ', width=maxwidth))
                 s.write("\n")
             s.seek(0)
             return s.read()
