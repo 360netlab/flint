@@ -15,7 +15,7 @@ except ImportError:
     import simplejson as json
 import traceback
 
-__VERSION__ = "0.1.7"
+__VERSION__ = "0.1.8"
 
 __AUTHOR__ = "passivedns@360.cn" # All original credit to passivedns@360.cn. Fork changes by x123@users.noreply.github.com
 
