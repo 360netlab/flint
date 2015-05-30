@@ -1,6 +1,8 @@
 flint
 =====
 
+[![Join the chat at https://gitter.im/360netlab/flint](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/360netlab/flint?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 flint is a advanced python client for 360 passivedns HTTP API.   
 The associated web interface is http://www.passivedns.cn
 
