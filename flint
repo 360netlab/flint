@@ -15,7 +15,7 @@ except ImportError:
     import simplejson as json
 import traceback
 
-__VERSION__ = "0.1.8"
+__VERSION__ = "0.1.9"
 
 __AUTHOR__ = "passivedns@360.cn" # All original credit to passivedns@360.cn. Fork changes by x123@users.noreply.github.com
 
@@ -90,7 +90,7 @@ class FlintClient(object):
             except socket.timeout:
                 self.panic("[api timeout]: %s" %(url), False)
                 return None
-            except (urllib2.HTTPError, urllib2.URLError),e:
+            except (urllib2.HTTPError, urllib2.URLError), e:
                 self.panic("[api error]: %s" %(url))
                 return None
 
@@ -119,7 +119,7 @@ class FlintClient(object):
         print "#################"
         print resp.code
         print resp.headers
-        print data[:100], "..." if len(data) > 100 else data
+        #print data[:100] + "..." if len(data) > 100 else data
         print "============================================"
         print
 
@@ -136,6 +136,9 @@ class FlintClient(object):
             path = "%srtype/%s/" %(path, FLINT_TYPES[f_type])
         if f_netmask is not None:
             path = "%smask/%s/" %(path, str(f_netmask))
+        if options.source:
+            path = "%ssource/%s/"%(path, str(options.source))
+
         if self.api.startswith("http://"):
             url = "%s%s" %(self.api, path)
         else:
@@ -173,22 +176,30 @@ class FlintClient(object):
         return data
 
     def rrset(self, rrname, rrtype=None, sort="time_last", reverse=False,
-                limit=1000, jsond=False, after=None, before=None, **kwargs):
+                limit=1000, jsond=False, plain=False, after=None, before=None, **kwargs):
 
         def _dump(rrname, rrtype, data):
             s = StringIO()
-            s.write("%s %s In rrset\n" %(rrname, rrtype or "All Type"))
-            s.write("-------\n")
+            if not plain:
+                s.write("%s %s In rrset\n" %(rrname, rrtype or "All Type"))
+                s.write("-------\n")
             for r in data:
-                s.write("Record times: %s -- %s\n" %(self._timefmt(r['time_first']), 
-                    self._timefmt(r['time_last'])))
-                s.write("Count: %d\n" %(int(r['count'])))
+                time_first = self._timefmt(r['time_first'])
+                time_last =  self._timefmt(r['time_last'])
+                count = int(r['count'])
+                if not plain:
+                    s.write("Record times: %s -- %s\n" %(self._timefmt(r['time_first']), 
+                        self._timefmt(r['time_last'])))
+                    s.write("Count: %d\n" %(int(r['count'])))
                 rdata = r['rdata'].rstrip(";").split(";")
                 for rd in rdata:
-                    s.write("%s\t%s\t%s\n" %(r['rrname'], r['rrtype'], rd))
+                    if not plain:
+                        s.write("%s\t%s\t%s\n" %(r['rrname'], r['rrtype'], rd))
+                    else:
+                        s.write("%s\t%s\t%s\t%s\t%s\t%s\n" %(time_first, time_last, count, r['rrname'], r['rrtype'], rd))
                 s.write("\n")
             s.seek(0)
-            return s.read()
+            return s.read().strip()
 
         resp, data = self.query("rrset", rrname, rrtype)
 
@@ -216,7 +227,7 @@ class FlintClient(object):
                 break
             resp, data = self.next_query(next)
 
-    def rdata(self, rdata, rrtype=None, limit=1000, jsond=False, **kwargs):
+    def rdata(self, rdata, rrtype=None, limit=1000, jsond=False, plain=False, **kwargs):
 
         def _dump(rdata, rrtype, data):
             maxwidth = 0  # find the maximum width of an rrset to prevent ugly formatting
@@ -225,13 +236,14 @@ class FlintClient(object):
                     maxwidth = len(r['rrname'])
 
             s = StringIO()
-            s.write("%s %s In rdata\n" %(rdata, rrtype or "All Type"))
-            s.write("--------\n")
+            if not plain:
+                s.write("%s %s In rdata\n" %(rdata, rrtype or "All Type"))
+                s.write("--------\n")
             for r in data:
                 s.write('{0:{fill}<{width}}\t{1}\t{2}'.format(r['rrname'], r['rdata'],  self._timefmt(r['time_last']), fill=' ', width=maxwidth))
                 s.write("\n")
             s.seek(0)
-            return s.read()
+            return s.read().strip()
 
         if self.is_cidr(rdata):
             ip, netmask = rdata.split("/")    
@@ -369,12 +381,17 @@ def parse_option():
                     help='config file', default=DEFAULT_CONFIG_FILE)
     parser.add_option("-j", "--json", action="store_true", dest="jsond", default=False,
                     help="output in json format")
+    parser.add_option("-p", "--plain", action="store_true", dest="plain", default=False,
+                    help="output in plain format")
     parser.add_option("-l", "--limit", action="store", type="int", default=1000, dest="limit",
                     help="limit number of results. [default: %default]")
     parser.add_option("-s", "--sort", action="store", type="string", default="time_last", dest="sort",
                     help="|".join(FLINT_SORT_FIELD)+" [default: %default]")
     parser.add_option("-R", "--reverse", dest="reverse", action="store_false", default=True,
                     help="reverse sort")
+
+    parser.add_option("-S", "--source", dest="source", action="store", default="", help="data sourc3")
+
     parser.add_option("", "--before", dest="before", type="string", action="store", 
                     help="only output results seen before this time")
     parser.add_option("", "--after", dest="after", type="string", action="store", 
@@ -384,6 +401,7 @@ def parse_option():
 
 if __name__ == "__main__":
 
+    global options, args
     parser = parse_option()
     options, args = parser.parse_args()
 
