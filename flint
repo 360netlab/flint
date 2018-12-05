@@ -15,20 +15,13 @@ except ImportError:
     import simplejson as json
 import traceback
 
-__VERSION__ = "0.1.9"
+__VERSION__ = "0.3.0"
 
 __AUTHOR__ = "passivedns@360.cn" # All original credit to passivedns@360.cn. Fork changes by x123@users.noreply.github.com
 
+API = "api.passivedns.cn"
 
-API = ""
-
-#This ID will be used as the identification by authentication system 
-API_ID = ""
-
-#This key is matched with API_ID, be used for calcuate message hash token.
-API_KEY = ""
-
-DEFAULT_CONFIG_FILE = '/etc/flint.conf'
+DEFAULT_CONFIG_FILE = '/etc/netlab.token'
 
 FLINT_TABLES = ['rrset', 'rdata']
 
@@ -52,6 +45,9 @@ FLINT_TYPES = {
         "NSEC3" : 50
 }
 
+ENCODING = sys.stdin.encoding
+if ENCODING == None:
+    ENCODING = "UTF-8"
 
 class FlintClient(object):
 
@@ -59,10 +55,9 @@ class FlintClient(object):
 
     MAX_RETRY = 5
 
-    def __init__(self, api, api_id, api_key, verbose = False):
-        self.api = api
-        self.api_id = api_id
-        self.api_key = api_key
+    def __init__(self, api, token, verbose = False):
+        self.token   = token
+        self.api     = api
         self.verbose = verbose
 
     def __call__(self, f_table, f_keyword, f_type, *args, **kwargs):
@@ -77,7 +72,7 @@ class FlintClient(object):
                 if self.verbose:
                     self.debug_info(req, resp, data)
                 try:
-                    data = json.loads(data)
+                    data = json.loads(data)["data"]
                 except Exception, e:
                     self.panic(data)
 
@@ -91,7 +86,7 @@ class FlintClient(object):
                 self.panic("[api timeout]: %s" %(url), False)
                 return None
             except (urllib2.HTTPError, urllib2.URLError), e:
-                self.panic("[api error]: %s" %(url))
+                self.panic("[api error]: %s [%s]" %(url, str(e)))
                 return None
 
         retry = max_retry + 1
@@ -119,7 +114,7 @@ class FlintClient(object):
         print "#################"
         print resp.code
         print resp.headers
-        #print data[:100] + "..." if len(data) > 100 else data
+        print data[:100] + "..." if len(data) > 100 else data
         print "============================================"
         print
 
@@ -131,18 +126,23 @@ class FlintClient(object):
         return self._do_query(req, max_retry=self.MAX_RETRY)
 
     def query(self, f_table, f_keyword, f_type = None, f_netmask = None):
-        path = "/api/%s/keyword/%s/" %(f_table, f_keyword)
+        path = "/flint/%s/%s" %(f_table, f_keyword)
+        opts = {}
         if f_type is not None:
-            path = "%srtype/%s/" %(path, FLINT_TYPES[f_type])
+            opts["rtype"] = FLINT_TYPES[f_type]
         if f_netmask is not None:
-            path = "%smask/%s/" %(path, str(f_netmask))
+            opts["mask"]  = str(f_netmask)
         if options.source:
-            path = "%ssource/%s/"%(path, str(options.source))
+            opts["source"] = str(options.source)
+        if options.limit:
+            opts["batch"] = str(options.limit)
+
+        opts = '&'.join(["%s=%s" %(k,v) for k,v in opts.items()])
 
         if self.api.startswith("http://"):
-            url = "%s%s" %(self.api, path)
+            url = "%s%s/?%s" %(self.api, path, opts)
         else:
-            url = "http://%s%s" %(self.api, path)
+            url = "http://%s%s/?%s" %(self.api, path, opts)
 
         req = urllib2.Request(url)
         req = self.setup_header(req, path)
@@ -152,11 +152,8 @@ class FlintClient(object):
     def setup_header(self, req, path):
         req.add_header('Accept', 'application/json')
         req.add_header('User-Agent', 'netlab/flint-%s' %__VERSION__)
-        if self.api_id:
-            req.add_header('X-BashTokid', self.api_id);
-        if self.api_key:
-            token = self.genToken(path, self.api_key)
-            req.add_header('X-BashToken', token)
+        if self.token:
+            req.add_header('X-AuthToken', self.token)
         return req
 
     def filter(self, data, sort, reverse, before, after):
@@ -185,22 +182,29 @@ class FlintClient(object):
                 s.write("-------\n")
             for r in data:
                 time_first = self._timefmt(r['time_first'])
-                time_last =  self._timefmt(r['time_last'])
+                time_last  = self._timefmt(r['time_last'])
+                _source    = r.get("_source", "").upper() if options.source else ""
                 count = int(r['count'])
                 if not plain:
-                    s.write("Record times: %s -- %s\n" %(self._timefmt(r['time_first']), 
-                        self._timefmt(r['time_last'])))
+                    s.write("Record times: %s -- %s  %s\n"%(
+                        self._timefmt(r['time_first']), 
+                        self._timefmt(r['time_last']),
+                        _source
+                    ))
                     s.write("Count: %d\n" %(int(r['count'])))
                 rdata = r['rdata'].rstrip(";").split(";")
                 for rd in rdata:
                     if not plain:
                         s.write("%s\t%s\t%s\n" %(r['rrname'], r['rrtype'], rd))
                     else:
-                        s.write("%s\t%s\t%s\t%s\t%s\t%s\n" %(time_first, time_last, count, r['rrname'], r['rrtype'], rd))
-                s.write("\n")
+                        s.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %(time_first, time_last, count, 
+                            r['rrname'], r['rrtype'], rd, _source))
+                #s.write("\n")
             s.seek(0)
             return s.read().strip()
 
+        global ENCODING
+        rrname=rrname.decode(ENCODING).encode('idna')
         resp, data = self.query("rrset", rrname, rrtype)
 
         next = None
@@ -240,11 +244,22 @@ class FlintClient(object):
                 s.write("%s %s In rdata\n" %(rdata, rrtype or "All Type"))
                 s.write("--------\n")
             for r in data:
-                s.write('{0:{fill}<{width}}\t{1}\t{2}'.format(r['rrname'], r['rdata'],  self._timefmt(r['time_last']), fill=' ', width=maxwidth))
+                _source = r.get("_source", "").upper() if options.source else ""
+                s.write('{0:{fill}<{width}}\t{1}\t{2}\t{3}'.format(
+                    r['rrname'], 
+                    r['rdata'],
+                    self._timefmt(r['time_last']),
+                    _source,
+                    fill=' ',
+                    width=maxwidth
+                ))
                 s.write("\n")
             s.seek(0)
             return s.read().strip()
 
+        global ENCODING
+        rdata = rdata.decode(ENCODING).encode("idna")
+        
         if self.is_cidr(rdata):
             ip, netmask = rdata.split("/")    
             resp, data = self.query("rdata", ip, rrtype, netmask)
@@ -338,7 +353,7 @@ class FlintClient(object):
 def parse_config(cfg_fname):
     config = {}
     cfg_files = filter(os.path.isfile,
-            (cfg_fname, os.path.expanduser('~/.flint.conf')))
+            (cfg_fname, os.path.expanduser('~/.netlab.token')))
 
     if not cfg_files:
         raise Exception("No config file found")
@@ -390,12 +405,14 @@ def parse_option():
     parser.add_option("-R", "--reverse", dest="reverse", action="store_false", default=True,
                     help="reverse sort")
 
-    parser.add_option("-S", "--source", dest="source", action="store", default="", help="data sourc3")
+    parser.add_option("-S", "--source", dest="source", action="store", default="ALL", help="data source")
 
     parser.add_option("", "--before", dest="before", type="string", action="store", 
                     help="only output results seen before this time")
     parser.add_option("", "--after", dest="after", type="string", action="store", 
                     help="only output results seen after this time")
+    parser.add_option("", "--api", dest="api", type="string", action="store", default=API,
+                    help="configure API address, [default:%default]")
     return parser
 
 
@@ -437,12 +454,10 @@ if __name__ == "__main__":
         sys.stderr.write("%s\n" %e.message)
         sys.exit(1)
 
-    API = API or config.get("API", "")
-    API_ID = API_ID or config.get("API_ID","")
-    API_KEY = API_KEY or config.get("API_KEY", "")
+    token = config.get("TOKEN", None)
 
     try:
-        flint = FlintClient(API, API_ID, API_KEY, options.verbose) 
+        flint = FlintClient(options.api, token, options.verbose) 
         flint(f_table, f_keyword, f_type, **options.__dict__)
     except KeyboardInterrupt, e:
         print ">>> User Interrupt."
