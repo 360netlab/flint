@@ -98,13 +98,17 @@ the netmask must be >=24
 
 
 
-## How to run this script
+## How to run the script?
 
-Use this script to access 360 passivedns database, you must apply an api authentication key first.
+Before execute the script, a config file that contain the authentication token should be configured properly.
+Any of the following two methods can be work fine.
 
-1. Email passivedns@360.cn to apply the API_ID & API_KEY
-2. Modify the flint.conf use the API_KEY and API_ID we allocate for you
-3. Copy flint.conf to ~/.flint.conf or /etc/flint.conf
+1. ``cat TOKEN = xxxxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxx > ~/.netlab.token`` (Higly recommend)
+2. Create netlab.token file at any path, and assign a specified configuration file while running the script with  `-c` parameter. 
 
+	``flint rrset apple.com -c {PATH}/netlab.token``
+    
+## Apply access token
 
+Please send an email to passivedns@360.cn and apply the token.
 
